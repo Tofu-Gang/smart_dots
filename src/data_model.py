@@ -2,28 +2,39 @@ __author__ = 'Tofu Gang'
 
 from PyQt5.QtWidgets import QGraphicsScene
 from PyQt5.QtCore import QRectF, QPointF, Qt
-from PyQt5.QtGui import QPen, QPainterPath
-from src.dot import Dot
-from random import randint
+from PyQt5.QtGui import QPen
+from src.path_finding import VisibilityGraph
+from src.population import Population
 
 ################################################################################
 
 class DataModel(QGraphicsScene):
-    WIDTH = 400
-    HEIGHT = 400
+    WIDTH = 800
+    HEIGHT = 800
     WALL_THICKNESS = 5
     ALLOWED_AREA = QRectF(QPointF(-WIDTH/2, -HEIGHT/2), QPointF(WIDTH/2, HEIGHT/2))
-    WALLS = QPainterPath()
-    WALLS.setFillRule(Qt.OddEvenFill)
+    START_POINT = QPointF(0, HEIGHT/2-20)
+    GOAL_POINT = QPointF(0, -HEIGHT / 2 + 20)
+    GOAL_TOLERANCE = 50
     # walls around the allowed area
-    WALLS.addRect(ALLOWED_AREA.adjusted(-WALL_THICKNESS, -WALL_THICKNESS, WALL_THICKNESS, WALL_THICKNESS))
-    WALLS.addRect(ALLOWED_AREA)
-    # some random wall
-    WALLS.addRect(QRectF(QPointF(-50, -WALL_THICKNESS / 2),
-                         QPointF(50, WALL_THICKNESS / 2)))
-    START_AREA = QRectF(QPointF(-100, HEIGHT/4), QPointF(100, HEIGHT/2-WALL_THICKNESS))
-    WINNING_AREA = QRectF(QPointF(-100, -HEIGHT/2+WALL_THICKNESS), QPointF(100, -HEIGHT/4))
-    POPULATION = 200
+    WALLS_SURROUNDING = []
+    # left
+    WALLS_SURROUNDING.append(QRectF(QPointF(ALLOWED_AREA.left()-WALL_THICKNESS, ALLOWED_AREA.top()-WALL_THICKNESS),
+                                    QPointF(ALLOWED_AREA.left(), ALLOWED_AREA.bottom()+WALL_THICKNESS)))
+    # right
+    WALLS_SURROUNDING.append(QRectF(QPointF(ALLOWED_AREA.right(), ALLOWED_AREA.top()-WALL_THICKNESS),
+                                    QPointF(ALLOWED_AREA.right()+WALL_THICKNESS, ALLOWED_AREA.bottom()+WALL_THICKNESS)))
+    # top
+    WALLS_SURROUNDING.append(QRectF(QPointF(ALLOWED_AREA.left()-WALL_THICKNESS, ALLOWED_AREA.top()-WALL_THICKNESS),
+                                    QPointF(ALLOWED_AREA.right()+WALL_THICKNESS, ALLOWED_AREA.top())))
+    # bottom
+    WALLS_SURROUNDING.append(QRectF(QPointF(ALLOWED_AREA.left()-WALL_THICKNESS, ALLOWED_AREA.bottom()),
+                                    QPointF(ALLOWED_AREA.right()+WALL_THICKNESS, ALLOWED_AREA.bottom()+WALL_THICKNESS)))
+    # custom walls
+    WALLS_CUSTOM = []
+    WALLS_CUSTOM.append(QRectF(QPointF(ALLOWED_AREA.left()-WALL_THICKNESS, HEIGHT/4), QPointF(ALLOWED_AREA.left()+WIDTH-100, HEIGHT/4+WALL_THICKNESS)))
+    WALLS_CUSTOM.append(QRectF(QPointF(ALLOWED_AREA.left()+100, 0), QPointF(ALLOWED_AREA.right()+WALL_THICKNESS, WALL_THICKNESS)))
+    VISIBILITY_GRAPH = VisibilityGraph(START_POINT, GOAL_POINT, WALLS_CUSTOM+WALLS_SURROUNDING, ALLOWED_AREA)
 
 ################################################################################
 
@@ -34,88 +45,29 @@ class DataModel(QGraphicsScene):
 
         super().__init__()
         self.setSceneRect(self.ALLOWED_AREA)
-        self._winCounter = 0
-        self._exhaustedCounter = 0
-        self._deadCounter = 0
-        self._winCounterItem = self.addSimpleText(str(self._winCounter))
-        self._exhaustedCounterItem = self.addSimpleText(str(self._exhaustedCounter))
-        self._deadCounterItem = self.addSimpleText(str(self._deadCounter))
-        self._winCounterItem.setPos(self.WINNING_AREA.center())
-        self._exhaustedCounterItem.setPos(QPointF(self.START_AREA.center().x(), self.START_AREA.top()))
-        self._deadCounterItem.setPos(QPointF(self.START_AREA.center().x(), self.START_AREA.bottom()-self._deadCounterItem.boundingRect().height()))
-        self._population = []
+        self._population = Population(self)
+        self._generationCountItem = self.addSimpleText('gen: '+str(self._population.generationCount))
+        self._generationCountItem.setPos(QPointF(-self.WIDTH/2+20, -self.HEIGHT/2+20))
+        self._wonCountItem = self.addSimpleText('won: '+str(self._population.wonCount))
+        self._wonCountItem.setPos(QPointF(-self.WIDTH/2+20, -self.HEIGHT/2+40))
+        self._exhaustedCountItem = self.addSimpleText('exh: '+str(self._population.exhaustedCount))
+        self._exhaustedCountItem.setPos(QPointF(-self.WIDTH/2+20, -self.HEIGHT/2+60))
+        self._deadCountItem = self.addSimpleText('ded: '+str(self._population.deadCount))
+        self._deadCountItem.setPos(QPointF(-self.WIDTH/2+20, -self.HEIGHT/2+80))
+        self._population.updateCounters.connect(self._updateCounters)
+        self._ctrlFlag = False
 
 ################################################################################
 
-    def _processDot(self):
-        """
-
-        """
-        dot = self.sender().dot
-        if dot.state is dot.State.WON:
-            self._winCounter += 1
-            self._winCounterItem.setText(str(self._winCounter))
-            stepsCount = dot.stepsCount
-        elif dot.state is dot.State.EXHAUSTED:
-            self._exhaustedCounter += 1
-            self._exhaustedCounterItem.setText(str(self._exhaustedCounter))
-        elif dot.state is dot.State.DEAD:
-            self._deadCounter += 1
-            self._deadCounterItem.setText(str(self._deadCounter))
-
-        self._population.remove(dot)
-        self.removeItem(dot)
-        self._checkCounters()
-
-################################################################################
-
-    def _checkCounters(self):
+    def _updateCounters(self):
         """
 
         """
 
-        if len(self._population) == 0:
-            if self._winCounter+self._exhaustedCounter+self._deadCounter == self.POPULATION:
-                self._winCounterItem.setText(str(self._winCounter)+' ✔')
-                self._exhaustedCounterItem.setText(str(self._exhaustedCounter)+' ✔')
-                self._deadCounterItem.setText(str(self._deadCounter)+' ✔')
-            else:
-                self._winCounterItem.setText(str(self._winCounter) + ' ✘')
-                self._exhaustedCounterItem.setText(str(self._exhaustedCounter) + ' ✘')
-                self._deadCounterItem.setText(str(self._deadCounter) + ' ✘')
-
-################################################################################
-
-    def _resetCounters(self):
-        """
-
-        """
-
-        self._winCounter = 0
-        self._winCounterItem.setText(str(self._winCounter))
-        self._exhaustedCounter = 0
-        self._exhaustedCounterItem.setText(str(self._exhaustedCounter))
-        self._deadCounter = 0
-        self._deadCounterItem.setText(str(self._deadCounter))
-
-################################################################################
-
-    def _start(self):
-        """
-
-        """
-
-        self._resetCounters()
-
-        for _ in range(self.POPULATION):
-            dot = Dot()
-            dot.brain.finished.connect(self._processDot)
-            self._population.append(dot)
-            x = randint(self.START_AREA.left(), self.START_AREA.right())
-            y = randint(self.START_AREA.top(), self.START_AREA.bottom())
-            dot.setPos(x, y)
-            self.addItem(dot)
-            dot.start()
+        self._generationCountItem.setText('gen: '+str(self._population.generationCount))
+        self._wonCountItem.setText('won: '+str(self._population.wonCount))
+        self._exhaustedCountItem.setText('exh: '+str(self._population.exhaustedCount))
+        self._deadCountItem.setText('ded: '+str(self._population.deadCount))
 
 ################################################################################
 
@@ -124,8 +76,34 @@ class DataModel(QGraphicsScene):
 
         """
 
-        self._start()
+        self._population.start()
         super().mousePressEvent(event)
+
+################################################################################
+
+    def keyPressEvent(self, event):
+        """
+
+        """
+
+        key = event.key()
+        if key == Qt.Key_Control:
+            self._ctrlFlag = True
+            self.update()
+        super().keyPressEvent(event)
+
+################################################################################
+
+    def keyReleaseEvent(self, event):
+        """
+
+        """
+
+        key = event.key()
+        if key == Qt.Key_Control:
+            self._ctrlFlag = False
+            self.update()
+        super().keyReleaseEvent(event)
 
 ################################################################################
 
@@ -141,10 +119,10 @@ class DataModel(QGraphicsScene):
         painter.drawRect(self.ALLOWED_AREA)
         painter.setPen(Qt.blue)
         painter.setBrush(Qt.blue)
-        painter.drawRect(self.START_AREA)
+        painter.drawEllipse(self.START_POINT, 5, 5)
         painter.setPen(Qt.green)
         painter.setBrush(Qt.green)
-        painter.drawRect(self.WINNING_AREA)
+        painter.drawEllipse(self.GOAL_POINT, self.GOAL_TOLERANCE, self.GOAL_TOLERANCE)
         painter.setPen(Qt.black)
         super().drawBackground(painter, rect)
 
@@ -155,9 +133,20 @@ class DataModel(QGraphicsScene):
 
         """
 
-        painter.setPen(QPen(Qt.red, self.WALL_THICKNESS, join=Qt.MiterJoin))
-        painter.setBrush(Qt.NoBrush)
-        painter.drawPath(self.WALLS)
+        painter.setPen(QPen(Qt.red, 1, join=Qt.MiterJoin))
+        painter.setBrush(Qt.red)
+        for rect in self.WALLS_SURROUNDING:
+            painter.drawRect(rect)
+        for rect in self.WALLS_CUSTOM:
+            painter.drawRect(rect)
+        if self._ctrlFlag:
+            painter.setPen(Qt.green)
+            for edge in self.VISIBILITY_GRAPH.shortestRouteEdges:
+                painter.drawLine(edge)
+        else:
+            painter.setPen(Qt.black)
+            for edge in self.VISIBILITY_GRAPH.edges:
+                painter.drawLine(edge)
         super().drawForeground(painter, rect)
 
 ################################################################################
