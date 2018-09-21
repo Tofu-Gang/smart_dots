@@ -168,12 +168,7 @@ class Dot(QGraphicsObject):
         if self._state is self.State.WON:
             return 1/16+10000/pow(len(self._usedVectors), 2)
         else:
-            # TODO: no idea why the self._visibilityGraph isn't created when the dot reaches the goal
-            try:
-                distanceToFinish = self._visibilityGraph.shortestRouteDistance
-            except AttributeError:
-                self._visibilityGraph = VisibilityGraph(self.pos(), self.scene().GOAL_POINT, self.scene().WALLS_CUSTOM+self.scene().WALLS_SURROUNDING, self.scene().ALLOWED_AREA)
-                distanceToFinish = self._visibilityGraph.shortestRouteDistance
+            distanceToFinish = self._visibilityGraph.shortestRouteDistance
             return 1/pow(distanceToFinish, 2)
 
 ################################################################################
@@ -247,6 +242,10 @@ class Dot(QGraphicsObject):
             if any(PathFinding.intersects(rect, moveLine) for rect in self.scene().WALLS_SURROUNDING) \
               or any(PathFinding.intersects(rect, moveLine) for rect in self.scene().WALLS_CUSTOM):
                 self._setState(self.State.DEAD)
+                self._visibilityGraph = VisibilityGraph(self.pos(),
+                                                        self.scene().GOAL_POINT,
+                                                        self.scene().WALLS_CUSTOM + self.scene().WALLS_SURROUNDING,
+                                                        self.scene().ALLOWED_AREA)
                 self.finished.emit()
             else:
                 velocityMagnitude = pow(pow(self._velocity[0], 2)+pow(self._velocity[1], 2), 0.5)
@@ -259,9 +258,17 @@ class Dot(QGraphicsObject):
 
                 if QLineF(newPos, self.scene().GOAL_POINT).length() < self.scene().GOAL_TOLERANCE:
                     self._setState(self.State.WON)
+                    self._visibilityGraph = VisibilityGraph(self.pos(),
+                                                            self.scene().GOAL_POINT,
+                                                            self.scene().WALLS_CUSTOM + self.scene().WALLS_SURROUNDING,
+                                                            self.scene().ALLOWED_AREA)
                     self.finished.emit()
         else:
             self._setState(self.State.EXHAUSTED)
+            self._visibilityGraph = VisibilityGraph(self.pos(),
+                                                    self.scene().GOAL_POINT,
+                                                    self.scene().WALLS_CUSTOM + self.scene().WALLS_SURROUNDING,
+                                                    self.scene().ALLOWED_AREA)
             self.finished.emit()
 
 ################################################################################
