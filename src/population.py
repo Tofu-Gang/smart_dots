@@ -33,7 +33,7 @@ class Population(QObject):
             dot.setPos(self._scene.START_POINT)
             self._scene.addItem(dot)
             self._population.append(dot)
-            dot.brain.finished.connect(self._dotFinished)
+            dot.finished.connect(self._dotFinished)
 
 ################################################################################
 
@@ -92,7 +92,7 @@ class Population(QObject):
 
         """
 
-        [dot.start() for dot in self._population]
+        [dot.life() for dot in self._population]
 
 ################################################################################
 
@@ -131,22 +131,22 @@ class Population(QObject):
 
         # get the champion
         champion = sorted([dot for dot in self._population], key=lambda dot: dot.fitnessFunction)[-1]
-        child = champion.child
-        child.dotType = child.Type.CHAMPION
+        child = champion.getChild()
+        child.setChampion()
         child.setPos(self._scene.START_POINT)
         self._scene.addItem(child)
         newGeneration.append(child)
-        child.brain.finished.connect(self._dotFinished)
+        child.finished.connect(self._dotFinished)
 
         # population size - 1 because of the champion already being in the next generation
         for i in range(self.POPULATION_SIZE-1):
             parent = self._getParent()
-            child = parent.child
+            child = parent.getChild()
             child.mutate()
             child.setPos(self._scene.START_POINT)
             self._scene.addItem(child)
             newGeneration.append(child)
-            child.brain.finished.connect(self._dotFinished)
+            child.finished.connect(self._dotFinished)
 
         [self._scene.removeItem(dot) for dot in self._population]
         self._population.clear()
