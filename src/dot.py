@@ -1,8 +1,8 @@
 __author__ = 'Tofu Gang'
 
-from PyQt5.QtGui import QPen
-from PyQt5.QtCore import Qt, pyqtSignal as Signal, QThread, QLineF, QPointF
-from PyQt5.QtWidgets import QGraphicsEllipseItem
+from PyQt5.QtGui import QPen, QPainterPath
+from PyQt5.QtCore import Qt, pyqtSignal as Signal, QThread, QLineF, QPointF, QRectF
+from PyQt5.QtWidgets import QGraphicsObject
 from time import sleep
 from random import uniform, random
 from math import pi, sin, cos
@@ -11,9 +11,15 @@ from src.path_finding import PathFinding, VisibilityGraph
 
 ################################################################################
 
-class Dot(QGraphicsEllipseItem):
+class Dot(QGraphicsObject):
     DIAMETER_REGULAR = 5
     DIAMETER_CHAMPION = 8
+    BOUNDING_RECT_REGULAR = QRectF(QPointF(-DIAMETER_REGULAR/2, -DIAMETER_REGULAR/2), QPointF(DIAMETER_REGULAR/2, DIAMETER_REGULAR/2))
+    BOUNDING_RECT_CHAMPION = QRectF(QPointF(-DIAMETER_CHAMPION/2, -DIAMETER_CHAMPION/2), QPointF(DIAMETER_CHAMPION/2, DIAMETER_CHAMPION/2))
+    SHAPE_REGULAR = QPainterPath()
+    SHAPE_REGULAR.addEllipse(BOUNDING_RECT_REGULAR)
+    SHAPE_CHAMPION = QPainterPath()
+    SHAPE_CHAMPION.addEllipse(BOUNDING_RECT_CHAMPION)
     PEN_WIDTH = 1
     ACCELERATION_LIMIT = 5
 
@@ -36,14 +42,7 @@ class Dot(QGraphicsEllipseItem):
 
         self._type = type
         self._population = population
-        if self._type is self.Type.REGULAR:
-            super().__init__(-self.DIAMETER_REGULAR/2, -self.DIAMETER_REGULAR/2, self.DIAMETER_REGULAR, self.DIAMETER_REGULAR)
-            self.setBrush(Qt.white)
-        elif self._type is self.Type.CHAMPION:
-            super().__init__(-self.DIAMETER_CHAMPION/2, -self.DIAMETER_CHAMPION/2, self.DIAMETER_CHAMPION, self.DIAMETER_CHAMPION)
-            self.setBrush(Qt.blue)
-        self.setPen(QPen(Qt.black, self.PEN_WIDTH, Qt.SolidLine))
-
+        super().__init__()
         self._brain = Brain(population, vectors)
         self._brain.move.connect(self._move)
         self._usedVectors = []
@@ -51,6 +50,62 @@ class Dot(QGraphicsEllipseItem):
         self._acceleration = [0.0, 0.0]
         self._velocity = [0.0, 0.0]
         self._state = self.State.ALIVE
+
+################################################################################
+
+    def boundingRect(self):
+        """
+
+        :return:
+        """
+
+        if self._type is self.Type.REGULAR:
+            return self.BOUNDING_RECT_REGULAR
+        elif self._type is self.Type.CHAMPION:
+            return self.BOUNDING_RECT_CHAMPION
+        else:
+            return None
+
+################################################################################
+
+    def shape(self):
+        """
+
+        :return:
+        """
+
+        if self._type is self.Type.REGULAR:
+            return self.SHAPE_REGULAR
+        elif self._type is self.Type.CHAMPION:
+            return self.SHAPE_CHAMPION
+        else:
+            return None
+
+################################################################################
+
+    def paint(self, painter, option, widget=None):
+        """
+
+        :param painter:
+        :param option:
+        :param widget:
+        :return:
+        """
+        if self._state is self.State.ALIVE:
+            if self._type is self.Type.REGULAR:
+                painter.setBrush(Qt.white)
+            elif self._type is self.Type.CHAMPION:
+                painter.setBrush(Qt.blue)
+            else:
+                pass
+        elif self._state is self.State.DEAD:
+            painter.setBrush(Qt.darkRed)
+        elif self._state is self.State.WON:
+            painter.setBrush(Qt.darkGreen)
+        elif self._state is self.State.EXHAUSTED:
+            painter.setBrush(Qt.gray)
+        painter.setPen(QPen(Qt.black, self.PEN_WIDTH, Qt.SolidLine))
+        painter.drawEllipse(self.boundingRect())
 
 ################################################################################
 
@@ -70,14 +125,9 @@ class Dot(QGraphicsEllipseItem):
 
         """
 
-        if value is self.Type.REGULAR:
-            self._type = value
-            self.setRect(-self.DIAMETER_REGULAR/2, -self.DIAMETER_REGULAR/2, self.DIAMETER_REGULAR, self.DIAMETER_REGULAR)
-            self.setBrush(Qt.white)
-        elif value is self.Type.CHAMPION:
-            self._type = value
-            self.setRect(-self.DIAMETER_CHAMPION/2, -self.DIAMETER_CHAMPION/2, self.DIAMETER_CHAMPION, self.DIAMETER_CHAMPION)
-            self.setBrush(Qt.blue)
+        self.prepareGeometryChange()
+        self._type = value
+        self.update()
 
 ################################################################################
 
@@ -130,6 +180,18 @@ class Dot(QGraphicsEllipseItem):
 
 ################################################################################
 
+    def _setState(self, value):
+        """
+
+        :param value:
+        :return:
+        """
+
+        self._state = value
+        self.update()
+
+################################################################################
+
     @property
     def fitnessFunction(self):
         """
@@ -171,21 +233,18 @@ class Dot(QGraphicsEllipseItem):
             moveLine = QLineF(self.pos(), newPos)
             if any(PathFinding.intersects(rect, moveLine) for rect in self.scene().WALLS_SURROUNDING) \
               or any(PathFinding.intersects(rect, moveLine) for rect in self.scene().WALLS_CUSTOM):
-                self._state = self.State.DEAD
+                self._setState(self.State.DEAD)
                 self._stop()
-                self.setBrush(Qt.darkRed)
             else:
                 self.setPos(newPos)
                 self._usedVectors.append(vector)
                 self._distanceTravelled += moveLine.length()
                 if QLineF(newPos, self.scene().GOAL_POINT).length() < self.scene().GOAL_TOLERANCE:
-                    self._state = self.State.WON
+                    self._setState(self.State.WON)
                     self._stop()
-                    self.setBrush(Qt.darkGreen)
                 elif len(self._usedVectors) == self._population.maxVectorsCount:
-                    self._state = self.State.EXHAUSTED
+                    self._setState(self.State.EXHAUSTED)
                     self._stop()
-                    self.setBrush(Qt.gray)
 
 ################################################################################
 
