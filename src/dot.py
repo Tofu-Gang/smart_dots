@@ -64,7 +64,6 @@ class Dot(QGraphicsObject):
         self._distanceTravelled = 0
         self._acceleration = [0.0, 0.0]
         self._velocity = [0.0, 0.0]
-        self._i = 0
 
 ################################################################################
 
@@ -229,8 +228,9 @@ class Dot(QGraphicsObject):
         :return:
         """
 
-        if self._state is self.State.ALIVE and self._i < len(self._vectors) and self._i < self._population.maxVectorsCount:
-            vector = self._vectors[self._i]
+        if self._state is self.State.ALIVE and len(self._vectors) > 0 and len(self._usedVectors) < self._population.maxVectorsCount:
+            vector = self._vectors[0]
+            del self._vectors[0]
             self._acceleration[0] += vector[0]
             self._acceleration[1] += vector[1]
             accMagnitude = pow(pow(self._acceleration[0], 2)+pow(self._acceleration[1], 2), 0.5)
@@ -260,8 +260,6 @@ class Dot(QGraphicsObject):
                 if QLineF(newPos, self.scene().GOAL_POINT).length() < self.scene().GOAL_TOLERANCE:
                     self._setState(self.State.WON)
                     self.finished.emit()
-                else:
-                    self._i += 1
         else:
             self._setState(self.State.EXHAUSTED)
             self.finished.emit()
