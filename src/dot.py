@@ -224,23 +224,13 @@ class Dot(QGraphicsObject):
         """
 
         vector = self._vectors[0]
-        self._usedVectors.append(vector)
         del self._vectors[0]
-        self._acceleration[0] += vector[0]
-        self._acceleration[1] += vector[1]
-        accMagnitude = pow(pow(self._acceleration[0], 2)+pow(self._acceleration[1], 2), 0.5)
-        if accMagnitude > self.ACCELERATION_LIMIT:
-            self._acceleration[0] *= self.ACCELERATION_LIMIT/accMagnitude
-            self._acceleration[1] *= self.ACCELERATION_LIMIT/accMagnitude
-
-        self._velocity[0] += self._acceleration[0]
-        self._velocity[1] += self._acceleration[1]
+        self._useVector(vector)
         newPos = QPointF(self.pos().x()+self._velocity[0], self.pos().y()+self._velocity[1])
 
         # collisions check
         moveLine = QLineF(self.pos(), newPos)
-        if any(PathFinding.intersects(rect, moveLine) for rect in self.scene().WALLS_SURROUNDING) \
-          or any(PathFinding.intersects(rect, moveLine) for rect in self.scene().WALLS_CUSTOM):
+        if any(PathFinding.intersects(rect, moveLine) for rect in self.scene().walls):
             self._setState(self.State.DEAD)
             self._finalize()
         elif QLineF(newPos, self.scene().GOAL_POINT).length() < self.scene().GOAL_TOLERANCE:
@@ -253,6 +243,28 @@ class Dot(QGraphicsObject):
             self._animation.setStartValue(self.pos())
             self._animation.setEndValue(newPos)
             self._animation.start()
+
+################################################################################
+
+    def _useVector(self, vector):
+        """
+
+        :param vector:
+        :return:
+        """
+
+        self._acceleration[0] += vector[0]
+        self._acceleration[1] += vector[1]
+
+        accMagnitude = pow(pow(self._acceleration[0], 2)+pow(self._acceleration[1], 2), 0.5)
+        if accMagnitude > self.ACCELERATION_LIMIT:
+            self._acceleration[0] *= self.ACCELERATION_LIMIT/accMagnitude
+            self._acceleration[1] *= self.ACCELERATION_LIMIT/accMagnitude
+
+        self._velocity[0] += self._acceleration[0]
+        self._velocity[1] += self._acceleration[1]
+
+        self._usedVectors.append(vector)
 
 ################################################################################
 
@@ -281,7 +293,7 @@ class Dot(QGraphicsObject):
 
         self._visibilityGraph = VisibilityGraph(self.pos(),
                                                 self.scene().GOAL_POINT,
-                                                self.scene().WALLS_CUSTOM + self.scene().WALLS_SURROUNDING,
+                                                self.scene().walls,
                                                 self.scene().ALLOWED_AREA)
         self.finished.emit()
 

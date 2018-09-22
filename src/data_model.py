@@ -59,6 +59,17 @@ class DataModel(QGraphicsScene):
 
 ################################################################################
 
+    @property
+    def walls(self):
+        """
+
+        :return:
+        """
+
+        return self.WALLS_SURROUNDING+self.WALLS_CUSTOM
+
+################################################################################
+
     def _updateCounters(self):
         """
 
