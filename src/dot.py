@@ -52,7 +52,7 @@ class Dot(QGraphicsObject):
         self._state = self.State.ALIVE
         self._population = population
         self._animation = QPropertyAnimation(self, b'pos')
-        self._animation.finished.connect(self._move)
+        self._animation.finished.connect(self._stepFinished)
         if vectors:
             self._vectors = vectors
         else:
@@ -213,62 +213,76 @@ class Dot(QGraphicsObject):
         :return:
         """
 
-        self._move()
+        self._makeStep()
 
 ################################################################################
 
-    def _move(self):
+    def _makeStep(self):
         """
 
         :return:
         """
 
-        if self._state is self.State.ALIVE and len(self._vectors) > 0 and len(self._usedVectors) < self._population.maxVectorsCount:
-            vector = self._vectors[0]
-            del self._vectors[0]
-            self._acceleration[0] += vector[0]
-            self._acceleration[1] += vector[1]
-            accMagnitude = pow(pow(self._acceleration[0], 2)+pow(self._acceleration[1], 2), 0.5)
-            if accMagnitude > self.ACCELERATION_LIMIT:
-                self._acceleration[0] *= self.ACCELERATION_LIMIT/accMagnitude
-                self._acceleration[1] *= self.ACCELERATION_LIMIT/accMagnitude
+        vector = self._vectors[0]
+        self._usedVectors.append(vector)
+        del self._vectors[0]
+        self._acceleration[0] += vector[0]
+        self._acceleration[1] += vector[1]
+        accMagnitude = pow(pow(self._acceleration[0], 2)+pow(self._acceleration[1], 2), 0.5)
+        if accMagnitude > self.ACCELERATION_LIMIT:
+            self._acceleration[0] *= self.ACCELERATION_LIMIT/accMagnitude
+            self._acceleration[1] *= self.ACCELERATION_LIMIT/accMagnitude
 
-            self._velocity[0] += self._acceleration[0]
-            self._velocity[1] += self._acceleration[1]
-            newPos = QPointF(self.pos().x()+self._velocity[0], self.pos().y()+self._velocity[1])
+        self._velocity[0] += self._acceleration[0]
+        self._velocity[1] += self._acceleration[1]
+        newPos = QPointF(self.pos().x()+self._velocity[0], self.pos().y()+self._velocity[1])
 
-            # collisions check
-            moveLine = QLineF(self.pos(), newPos)
-            if any(PathFinding.intersects(rect, moveLine) for rect in self.scene().WALLS_SURROUNDING) \
-              or any(PathFinding.intersects(rect, moveLine) for rect in self.scene().WALLS_CUSTOM):
-                self._setState(self.State.DEAD)
-                self._visibilityGraph = VisibilityGraph(self.pos(),
-                                                        self.scene().GOAL_POINT,
-                                                        self.scene().WALLS_CUSTOM + self.scene().WALLS_SURROUNDING,
-                                                        self.scene().ALLOWED_AREA)
-                self.finished.emit()
-            else:
-                velocityMagnitude = pow(pow(self._velocity[0], 2)+pow(self._velocity[1], 2), 0.5)
-                self._animation.setDuration(ceil(moveLine.length()/velocityMagnitude)*50)
-                self._animation.setStartValue(self.pos())
-                self._animation.setEndValue(newPos)
-                self._animation.start()
-                self._usedVectors.append(vector)
-                self._distanceTravelled += moveLine.length()
-
-                if QLineF(newPos, self.scene().GOAL_POINT).length() < self.scene().GOAL_TOLERANCE:
-                    self._setState(self.State.WON)
-                    self._visibilityGraph = VisibilityGraph(self.pos(),
-                                                            self.scene().GOAL_POINT,
-                                                            self.scene().WALLS_CUSTOM + self.scene().WALLS_SURROUNDING,
-                                                            self.scene().ALLOWED_AREA)
-                    self.finished.emit()
+        # collisions check
+        moveLine = QLineF(self.pos(), newPos)
+        if any(PathFinding.intersects(rect, moveLine) for rect in self.scene().WALLS_SURROUNDING) \
+          or any(PathFinding.intersects(rect, moveLine) for rect in self.scene().WALLS_CUSTOM):
+            self._setState(self.State.DEAD)
+            self._finalize()
+        elif QLineF(newPos, self.scene().GOAL_POINT).length() < self.scene().GOAL_TOLERANCE:
+            self._setState(self.State.WON)
+            self._finalize()
         else:
-            self._setState(self.State.EXHAUSTED)
-            self._visibilityGraph = VisibilityGraph(self.pos(),
-                                                    self.scene().GOAL_POINT,
-                                                    self.scene().WALLS_CUSTOM + self.scene().WALLS_SURROUNDING,
-                                                    self.scene().ALLOWED_AREA)
-            self.finished.emit()
+            velocityMagnitude = pow(pow(self._velocity[0], 2)+pow(self._velocity[1], 2), 0.5)
+            self._distanceTravelled += moveLine.length()
+            self._animation.setDuration(ceil(moveLine.length()/velocityMagnitude)*50)
+            self._animation.setStartValue(self.pos())
+            self._animation.setEndValue(newPos)
+            self._animation.start()
+
+################################################################################
+
+    def _stepFinished(self):
+        """
+
+        :return:
+        """
+
+        if self._state is self.State.ALIVE:
+            if len(self._vectors) > 0:
+                self._makeStep()
+            else:
+                self._setState(self.State.EXHAUSTED)
+                self._finalize()
+        else:
+            self._finalize()
+
+################################################################################
+
+    def _finalize(self):
+        """
+
+        :return:
+        """
+
+        self._visibilityGraph = VisibilityGraph(self.pos(),
+                                                self.scene().GOAL_POINT,
+                                                self.scene().WALLS_CUSTOM + self.scene().WALLS_SURROUNDING,
+                                                self.scene().ALLOWED_AREA)
+        self.finished.emit()
 
 ################################################################################
