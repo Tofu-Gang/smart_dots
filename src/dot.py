@@ -230,19 +230,34 @@ class Dot(QGraphicsObject):
 
         # collisions check
         moveLine = QLineF(self.pos(), newPos)
-        if any(PathFinding.intersects(rect, moveLine) for rect in self.scene().walls):
+        collidingWalls = [wall for wall in self.scene().walls if PathFinding.intersects(wall, moveLine)]
+        if len(collidingWalls) > 0:
             self._setState(self.State.DEAD)
-            self._finalize()
+            for wall in collidingWalls:
+                # find out which sides of the wall the vector intersects, find the
+                # first collision point and set it as the new dot position
+                for wallSide in [QLineF(wall.topLeft(), wall.topRight()),
+                                 QLineF(wall.topLeft(), wall.bottomLeft()),
+                                 QLineF(wall.topRight(), wall.bottomRight()),
+                                 QLineF(wall.bottomLeft(), wall.bottomRight())]:
+                    point = QPointF()
+                    if wallSide.intersect(moveLine, point) == QLineF.BoundedIntersection:
+                        if QLineF(self.pos(), point).length() < moveLine.length():
+                            newPos = point
+                            moveLine = QLineF(self.pos(), newPos)
+                # set the new position slightly further from the wall, it messes the
+                # visibility graph initialization otherwise
+                newPos = moveLine.pointAt(0.99)
+                moveLine = QLineF(self.pos(), newPos)
         elif QLineF(newPos, self.scene().GOAL_POINT).length() < self.scene().GOAL_TOLERANCE:
             self._setState(self.State.WON)
-            self._finalize()
-        else:
-            velocityMagnitude = pow(pow(self._velocity[0], 2)+pow(self._velocity[1], 2), 0.5)
-            self._distanceTravelled += moveLine.length()
-            self._animation.setDuration(ceil(moveLine.length()/velocityMagnitude)*50)
-            self._animation.setStartValue(self.pos())
-            self._animation.setEndValue(newPos)
-            self._animation.start()
+
+        velocityMagnitude = pow(pow(self._velocity[0], 2)+pow(self._velocity[1], 2), 0.5)
+        self._distanceTravelled += moveLine.length()
+        self._animation.setDuration(ceil(moveLine.length()/velocityMagnitude)*50)
+        self._animation.setStartValue(self.pos())
+        self._animation.setEndValue(newPos)
+        self._animation.start()
 
 ################################################################################
 

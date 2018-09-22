@@ -108,12 +108,11 @@ class Population(QObject):
             self._maxVectorsCount = min(dot.usedVectorsCount for dot in dotsWon)
         self._exhaustedCount = len([dot for dot in self._population if dot.state is dot.State.EXHAUSTED])
         self._deadCount = len([dot for dot in self._population if dot.state is dot.State.DEAD])
+        self.updateCounters.emit()
 
         if self._finishedCounter == len(self._population):
             self._nextGeneration()
             self.start()
-
-        self.updateCounters.emit()
 
 ################################################################################
 

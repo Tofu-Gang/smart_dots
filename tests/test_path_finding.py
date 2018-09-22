@@ -83,23 +83,23 @@ class TestPathFinding(TestCase):
 
         rect = QRectF(QPointF(-50, -10), QPointF(50, 10))
         # line completely outside of the rectangle
-        self.assertFalse(PathFinding.intersects(rect, QLineF(QPointF(-100, -50), QPointF(-100, 50))))
+        self.assertFalse(PathFinding.intersectPoint(rect, QLineF(QPointF(-100, -50), QPointF(-100, 50))))
         # the line is a top side of the rectangle
-        self.assertFalse(PathFinding.intersects(rect, QLineF(rect.topLeft(), rect.topRight())))
+        self.assertFalse(PathFinding.intersectPoint(rect, QLineF(rect.topLeft(), rect.topRight())))
         # the line starts at the left corner of the rectangle and is not perpendicular to any of the rectangle sides;
         # the line ends outside of the rectangle, not going through it
-        self.assertFalse(PathFinding.intersects(rect, QLineF(rect.topLeft(), QPointF(-100, -100))))
+        self.assertFalse(PathFinding.intersectPoint(rect, QLineF(rect.topLeft(), QPointF(-100, -100))))
         # the line starts at the left corner of the rectangle and is perpendicular to the top side of the rectangle;
         # the line ends outside of the rectangle, not going through it
-        self.assertFalse(PathFinding.intersects(rect, QLineF(rect.topLeft(), QPointF(rect.left(), rect.top() - 100))))
+        self.assertFalse(PathFinding.intersectPoint(rect, QLineF(rect.topLeft(), QPointF(rect.left(), rect.top() - 100))))
         # the line is horizontal and goes straight through the center of the rectangle
-        self.assertTrue(PathFinding.intersects(rect, QLineF(QPointF(-100, 0), QPointF(100, 0))))
+        self.assertTrue(PathFinding.intersectPoint(rect, QLineF(QPointF(-100, 0), QPointF(100, 0))))
         # the line is vertical and goes straight through the center of the rectangle
-        self.assertTrue(PathFinding.intersects(rect, QLineF(QPointF(0, -100), QPointF(0, 100))))
+        self.assertTrue(PathFinding.intersectPoint(rect, QLineF(QPointF(0, -100), QPointF(0, 100))))
         # the line is vertical and goes up from the bottom right corner of the rectangle
-        self.assertFalse(PathFinding.intersects(rect, QLineF(rect.bottomRight(), QPointF(rect.right(), rect.top()-100))))
+        self.assertFalse(PathFinding.intersectPoint(rect, QLineF(rect.bottomRight(), QPointF(rect.right(), rect.top() - 100))))
         # the line is diagonal of the rectangle
-        self.assertTrue(PathFinding.intersects(rect, QLineF(rect.topLeft(), rect.bottomRight())))
+        self.assertTrue(PathFinding.intersectPoint(rect, QLineF(rect.topLeft(), rect.bottomRight())))
 
 ################################################################################
 
